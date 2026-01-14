@@ -1,12 +1,13 @@
 import React, { useRef, useEffect, useContext } from "react";
 import { SocketContext } from "../context/SocketContext";
 
-const RENDER_SCALE = 4.0; // Pixels per meter
-const RADAR_RADIUS = 300; // Pixels
+const RENDER_SCALE = 4.0;
+const RADAR_RADIUS = 300;
 
 const RadarDisplay = () => {
   const canvasRef = useRef(null);
   const { systemState } = useContext(SocketContext);
+  const scanAngle = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -16,133 +17,206 @@ const RadarDisplay = () => {
     const centerX = width / 2;
     const centerY = height / 2;
 
+    let animationFrameId;
+
     const drawGrid = () => {
+      // Clear with fade effect for trails (optional, but clean clear is better for this style)
       ctx.clearRect(0, 0, width, height);
 
-      // Draw background circles
       ctx.strokeStyle = "#1a3c5e";
       ctx.lineWidth = 1;
 
+      // Concentric Circles
       for (let r = 50; r <= RADAR_RADIUS; r += 50) {
         ctx.beginPath();
         ctx.arc(centerX, centerY, r, 0, 2 * Math.PI);
+        ctx.strokeStyle =
+          r === RADAR_RADIUS
+            ? "var(--color-primary)"
+            : "rgba(0, 243, 255, 0.2)";
         ctx.stroke();
+
+        // Range Markers
+        ctx.fillStyle = "rgba(0, 243, 255, 0.5)";
+        ctx.font = "10px Rajdhani";
+        ctx.fillText(
+          `${(r / RENDER_SCALE).toFixed(0)}m`,
+          centerX + 5,
+          centerY - r + 10
+        );
       }
 
-      // Draw Crosshairs
+      // Crosshairs
       ctx.beginPath();
       ctx.moveTo(centerX - RADAR_RADIUS, centerY);
       ctx.lineTo(centerX + RADAR_RADIUS, centerY);
       ctx.moveTo(centerX, centerY - RADAR_RADIUS);
       ctx.lineTo(centerX, centerY + RADAR_RADIUS);
+      ctx.strokeStyle = "rgba(0, 243, 255, 0.3)";
       ctx.stroke();
+
+      // X-ticks for degree markings
+      for (let i = 0; i < 360; i += 30) {
+        const rad = (i * Math.PI) / 180;
+        const tx = centerX + Math.cos(rad) * (RADAR_RADIUS + 10);
+        const ty = centerY + Math.sin(rad) * (RADAR_RADIUS + 10);
+        ctx.fillStyle = "rgba(0, 243, 255, 0.8)";
+        ctx.fillText(`${i}°`, tx - 5, ty);
+      }
     };
 
-    const drawTarget = (x, y, color, size, label) => {
-      // Transform (0,0) center to canvas coordinates
-      // Note: In simulation (0,0) is origin.
-      // Screen Y is inverted relative to standard Cartesian
+    const drawScanner = () => {
+      // Scanner Line
+      scanAngle.current = (scanAngle.current + 2) % 360;
+      const rad = (scanAngle.current * Math.PI) / 180;
+
+      const endX = centerX + Math.cos(rad) * RADAR_RADIUS;
+      const endY = centerY + Math.sin(rad) * RADAR_RADIUS;
+
+      // Gradient Cone
+      const gradient = ctx.createConicGradient(
+        rad - Math.PI / 2,
+        centerX,
+        centerY
+      );
+      gradient.addColorStop(0, "rgba(0, 243, 255, 0)");
+      gradient.addColorStop(0.8, "rgba(0, 243, 255, 0)");
+      gradient.addColorStop(1, "rgba(0, 243, 255, 0.15)"); // Trail
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, RADAR_RADIUS, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Leading Edge
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.lineTo(endX, endY);
+      ctx.strokeStyle = "rgba(0, 243, 255, 0.8)";
+      ctx.lineWidth = 2;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = "#00f3ff";
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    };
+
+    const drawTarget = (x, y, color, size, label, hollow = false) => {
       const screenX = centerX + x * RENDER_SCALE;
       const screenY = centerY - y * RENDER_SCALE;
 
       ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(screenX, screenY, size, 0, 2 * Math.PI);
-      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
 
-      // Glow
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = color;
-      ctx.fill();
-      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      if (hollow) {
+        ctx.arc(screenX, screenY, size, 0, 2 * Math.PI);
+        ctx.stroke();
+      } else {
+        ctx.arc(screenX, screenY, size, 0, 2 * Math.PI);
+        ctx.fill();
+        // Glow
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = color;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
 
       if (label) {
-        ctx.fillStyle = "#8ba2b5";
-        ctx.font = "10px Inter";
-        ctx.fillText(label, screenX + 8, screenY - 8);
+        ctx.fillStyle = color;
+        ctx.font = "12px Orbitron";
+        ctx.fillText(label, screenX + 10, screenY - 10);
+
+        // Connecting line
+        ctx.beginPath();
+        ctx.moveTo(screenX, screenY);
+        ctx.lineTo(screenX + 8, screenY - 8);
+        ctx.stroke();
       }
     };
 
     const drawTurret = (angleDeg) => {
-      // Angle is in degrees, standard math (0 is East/Right)
-      // Canvas Y is inverted, so negative angle correction if needed
-      // But let's assume we map math to screen directly:
-      // Math: 0 deg = Right. Canvas: 0 rad = Right.
-      // Math: 90 deg = Up. Canvas: -90 deg (since Y is down).
-
-      // However, our backend sends "Angle in degrees".
-      // If backend says 90 deg (North), on canvas with Y down, that is -90 deg (-PI/2).
-      // So we negate the angle for visualization if using standard cartesian logic on inverted Y.
       const angleRad = -((angleDeg * Math.PI) / 180);
-
       const endX = centerX + Math.cos(angleRad) * RADAR_RADIUS;
       const endY = centerY + Math.sin(angleRad) * RADAR_RADIUS;
 
-      ctx.strokeStyle = "#00f0ff";
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#00ff9d"; // Green for Turret
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5, 5]); // Dashed line
       ctx.beginPath();
       ctx.moveTo(centerX, centerY);
       ctx.lineTo(endX, endY);
       ctx.stroke();
+      ctx.setLineDash([]);
 
       // Turret Base
-      ctx.fillStyle = "#00f0ff";
+      ctx.fillStyle = "#00ff9d";
       ctx.beginPath();
-      ctx.arc(centerX, centerY, 5, 0, 2 * Math.PI);
+      ctx.arc(centerX, centerY, 4, 0, 2 * Math.PI);
       ctx.fill();
     };
 
-    // Render Frame
-    drawGrid();
+    const render = () => {
+      drawGrid();
+      drawScanner();
 
-    if (systemState) {
-      // Draw Turret
-      drawTurret(systemState.turret_angle);
+      if (systemState) {
+        drawTurret(systemState.turret_angle);
+        // Raw Measurement
+        drawTarget(
+          systemState.measured_target.x,
+          systemState.measured_target.y,
+          "rgba(255, 255, 255, 0.2)",
+          3,
+          null,
+          true
+        );
 
-      // Draw Measured Position (Raw Sensor) - Gray/Ghostly
-      drawTarget(
-        systemState.measured_target.x,
-        systemState.measured_target.y,
-        "rgba(255, 255, 255, 0.3)",
-        3
-      );
+        // Estimated Target
+        const threatColor =
+          systemState.threat_color === "red"
+            ? "var(--color-danger)"
+            : systemState.threat_color === "orange"
+            ? "var(--color-warning)"
+            : "var(--color-success)";
+        drawTarget(
+          systemState.estimated_target.x,
+          systemState.estimated_target.y,
+          threatColor,
+          5,
+          `TRGT [${systemState.threat_level}]`
+        );
+      }
 
-      // Draw Estimated Position (Kalman) - Green/Yellow/Red
-      const threatColor =
-        systemState.threat_color === "red"
-          ? "#ff2a2a"
-          : systemState.threat_color === "orange"
-          ? "#ffae00"
-          : "#00ff66";
-      drawTarget(
-        systemState.estimated_target.x,
-        systemState.estimated_target.y,
-        threatColor,
-        6,
-        "TRGT"
-      );
+      animationFrameId = requestAnimationFrame(render);
+    };
 
-      // Draw Trajectory/Velocity Vector
-      // TODO
-    }
+    render();
+
+    return () => cancelAnimationFrame(animationFrameId);
   }, [systemState]);
 
   return (
-    <div className="panel" style={{ display: "inline-block", padding: "10px" }}>
+    <div className="hud-panel" style={{ display: "inline-block" }}>
       <h3
         style={{
-          margin: "0 0 10px 0",
-          borderBottom: "1px solid #1a3c5e",
-          paddingBottom: "5px",
+          color: "var(--color-primary)",
+          display: "flex",
+          justifyContent: "space-between",
         }}
       >
-        RADAR.SYS // ACTIVE
+        <span>RADAR.SYS // </span>
+        <span style={{ fontSize: "0.6em", opacity: 0.8 }}>RANGE: 75m</span>
       </h3>
       <canvas
         ref={canvasRef}
         width={700}
         height={700}
-        style={{ background: "#111b2b", borderRadius: "4px" }}
+        style={{
+          borderRadius: "50%",
+          background:
+            "radial-gradient(circle, rgba(16,27,43,0) 0%, rgba(16,27,43,0.8) 100%)",
+        }}
       />
     </div>
   );

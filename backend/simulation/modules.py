@@ -13,6 +13,16 @@ class Target:
         self.state[0] += self.state[2] * self.dt
         self.state[1] += self.state[3] * self.dt
         
+        # World Boundaries (Bounce effect for endless demo)
+        # Radar Radius is ~75m (300px / 4px/m). Let's bound at 70m.
+        BOUNDARY = 70.0
+        
+        if self.state[0] > BOUNDARY or self.state[0] < -BOUNDARY:
+            self.state[2] *= -1 # Reverse X velocity
+            
+        if self.state[1] > BOUNDARY or self.state[1] < -BOUNDARY:
+            self.state[3] *= -1 # Reverse Y velocity
+        
         # Optional: Add small process noise (random acceleration/jerk)
         self.state[2] += np.random.normal(0, 0.1)
         self.state[3] += np.random.normal(0, 0.1)
