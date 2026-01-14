@@ -1,0 +1,77 @@
+:root {
+  --color-bg-dark: #0a0e17;
+  --color-radar-bg: #111b2b;
+  --color-grid: #1a3c5e;
+  --color-primary: #00f0ff; /* Cyberpunk Cyan */
+  --color-danger: #ff2a2a;
+  --color-warning: #ffae00;
+  --color-safe: #00ff66;
+  --color-text-main: #e0f0ff;
+  --color-text-dim: #8ba2b5;
+  --glass-bg: rgba(16, 27, 43, 0.7);
+  --glass-border: rgba(0, 240, 255, 0.2);
+
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-bg-dark);
+  color: var(--color-text-main);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: radial-gradient(
+      circle at 50% 50%,
+      #1a2a40 0%,
+      transparent 80%
+    ),
+    linear-gradient(rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.8));
+}
+
+button {
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  padding: 0.8em 1.5em;
+  font-size: 1em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  position: relative;
+  overflow: hidden;
+}
+
+button:hover {
+  background: var(--color-primary);
+  color: var(--color-bg-dark);
+  box-shadow: 0 0 15px var(--color-primary);
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+.panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 10px currentColor;
+}
