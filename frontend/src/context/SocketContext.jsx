@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useState } from "react";
+import React, { createContext, useState, useEffect } from "react";
 import io from "socket.io-client";
 
 export const SocketContext = createContext();
@@ -44,6 +44,10 @@ export const SocketProvider = ({ children }) => {
     if (socket) socket.emit("reset_simulation");
   };
 
+  const fireWeapon = () => {
+    if (socket) socket.emit("fire_weapon");
+  };
+
   return (
     <SocketContext.Provider
       value={{
@@ -53,6 +57,7 @@ export const SocketProvider = ({ children }) => {
         startSimulation,
         stopSimulation,
         resetSimulation,
+        fireWeapon,
       }}
     >
       {children}

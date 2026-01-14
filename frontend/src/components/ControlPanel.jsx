@@ -9,6 +9,7 @@ const ControlPanel = () => {
     startSimulation,
     stopSimulation,
     resetSimulation,
+    fireWeapon,
   } = useContext(SocketContext);
 
   const [logs, setLogs] = useState([]);
@@ -30,15 +31,17 @@ const ControlPanel = () => {
 
   useEffect(() => {
     if (systemState) {
-      if (Math.random() > 0.95) {
-        // Random telemetry logs
+      if (systemState.explosion) {
+        addLog("CONFIRMED HIT. TARGET NEUTRALIZED.");
+      }
+      if (Math.random() > 0.98) {
         addLog(
           `TELEMETRY UPDATE: TGT_POS [${systemState.estimated_target.x.toFixed(
             1
           )}, ${systemState.estimated_target.y.toFixed(1)}]`
         );
       }
-      if (systemState.threat_level === "HIGH" && Math.random() > 0.9) {
+      if (systemState.threat_level === "HIGH" && Math.random() > 0.95) {
         addLog("WARNING: HIGH SPEED TARGET DETECTED");
       }
     }
@@ -202,9 +205,18 @@ const ControlPanel = () => {
           unit="deg"
         />
         <DataBox
-          label="VELOCITY"
-          value={(Math.random() * 5 + 2).toFixed(1)}
-          unit="m/s"
+          label="WEAPON LOCK"
+          value={
+            systemState.lock_status >= 1.0
+              ? "LOCKED"
+              : `${(systemState.lock_status * 100).toFixed(0)}%`
+          }
+          unit=""
+          color={
+            systemState.lock_status >= 1.0
+              ? "var(--color-danger)"
+              : "var(--color-primary)"
+          }
         />
       </div>
 
@@ -255,23 +267,39 @@ const ControlPanel = () => {
       {/* Controls */}
       <div style={{ display: "flex", gap: "10px" }}>
         <button onClick={startSimulation} style={{ flex: 1 }}>
-          ENGAGE
+          RESUME
         </button>
         <button
-          onClick={stopSimulation}
+          onClick={fireWeapon}
           style={{
-            flex: 1,
-            borderColor: "var(--color-warning)",
-            color: "var(--color-warning)",
+            flex: 2,
+            background:
+              systemState.lock_status >= 1.0
+                ? "rgba(234, 0, 55, 0.2)"
+                : "rgba(100, 100, 100, 0.2)",
+            borderColor:
+              systemState.lock_status >= 1.0
+                ? "var(--color-danger)"
+                : "rgba(100, 100, 100, 0.5)",
+            color:
+              systemState.lock_status >= 1.0
+                ? "var(--color-danger)"
+                : "rgba(255, 255, 255, 0.3)",
+            boxShadow:
+              systemState.lock_status >= 1.0
+                ? "0 0 10px rgba(234, 0, 55, 0.2)"
+                : "none",
+            cursor: systemState.lock_status >= 1.0 ? "pointer" : "not-allowed",
           }}
         >
-          HALT
+          {systemState.lock_status >= 1.0 ? "FIRE WEAPON" : "AQUIRING LOCK..."}
         </button>
         <button
           onClick={resetSimulation}
           style={{
-            borderColor: "var(--color-danger)",
-            color: "var(--color-danger)",
+            flex: 1,
+            borderColor: "var(--color-warning)",
+            color: "var(--color-warning)",
           }}
         >
           RESET
@@ -281,7 +309,7 @@ const ControlPanel = () => {
   );
 };
 
-const DataBox = ({ label, value, unit }) => (
+const DataBox = ({ label, value, unit, color }) => (
   <div
     style={{
       background: "rgba(0, 243, 255, 0.05)",
@@ -298,7 +326,13 @@ const DataBox = ({ label, value, unit }) => (
     >
       {label}
     </div>
-    <div style={{ fontSize: "1.4em", fontFamily: "var(--font-display)" }}>
+    <div
+      style={{
+        fontSize: "1.4em",
+        fontFamily: "var(--font-display)",
+        color: color || "inherit",
+      }}
+    >
       {value}{" "}
       <span style={{ fontSize: "0.5em", color: "var(--color-primary)" }}>
         {unit}

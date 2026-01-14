@@ -66,8 +66,8 @@ const RadarDisplay = () => {
     };
 
     const drawScanner = () => {
-      // Scanner Line
-      scanAngle.current = (scanAngle.current + 2) % 360;
+      // Scanner Line - Slower speed
+      scanAngle.current = (scanAngle.current + 0.5) % 360;
       const rad = (scanAngle.current * Math.PI) / 180;
 
       const endX = centerX + Math.cos(rad) * RADAR_RADIUS;
@@ -81,23 +81,20 @@ const RadarDisplay = () => {
       );
       gradient.addColorStop(0, "rgba(0, 243, 255, 0)");
       gradient.addColorStop(0.8, "rgba(0, 243, 255, 0)");
-      gradient.addColorStop(1, "rgba(0, 243, 255, 0.15)"); // Trail
+      gradient.addColorStop(1, "rgba(0, 243, 255, 0.1)"); // Softer trail
 
       ctx.fillStyle = gradient;
       ctx.beginPath();
       ctx.arc(centerX, centerY, RADAR_RADIUS, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Leading Edge
+      // Leading Edge - Subtle
       ctx.beginPath();
       ctx.moveTo(centerX, centerY);
       ctx.lineTo(endX, endY);
-      ctx.strokeStyle = "rgba(0, 243, 255, 0.8)";
-      ctx.lineWidth = 2;
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = "#00f3ff";
+      ctx.strokeStyle = "rgba(0, 243, 255, 0.3)"; // Very low opacity
+      ctx.lineWidth = 1; // Thinner
       ctx.stroke();
-      ctx.shadowBlur = 0;
     };
 
     const drawTarget = (x, y, color, size, label, hollow = false) => {
@@ -162,6 +159,58 @@ const RadarDisplay = () => {
 
       if (systemState) {
         drawTurret(systemState.turret_angle);
+
+        // Draw Intercept Crosshair
+        if (systemState.intercept_point) {
+          const intX = centerX + systemState.intercept_point.x * RENDER_SCALE;
+          const intY = centerY - systemState.intercept_point.y * RENDER_SCALE;
+
+          ctx.strokeStyle = "rgba(234, 0, 55, 0.5)";
+          ctx.setLineDash([2, 4]);
+          ctx.beginPath();
+          ctx.moveTo(intX - 10, intY);
+          ctx.lineTo(intX + 10, intY);
+          ctx.moveTo(intX, intY - 10);
+          ctx.lineTo(intX, intY + 10);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // Draw Projectile
+        if (systemState.projectile) {
+          const projX = centerX + systemState.projectile.x * RENDER_SCALE;
+          const projY = centerY - systemState.projectile.y * RENDER_SCALE;
+
+          ctx.fillStyle = "#ffff00";
+          ctx.beginPath();
+          ctx.arc(projX, projY, 3, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = "#ffff00";
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+
+        // Draw Explosion
+        if (systemState.explosion) {
+          const expX = centerX + systemState.explosion.x * RENDER_SCALE;
+          const expY = centerY - systemState.explosion.y * RENDER_SCALE;
+          const radius = systemState.explosion.frame * 5;
+
+          ctx.strokeStyle = `rgba(255, 100, 0, ${
+            1 - systemState.explosion.frame / 20
+          })`;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(expX, expY, radius, 0, 2 * Math.PI);
+          ctx.stroke();
+
+          ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+          ctx.beginPath();
+          ctx.arc(expX, expY, 4, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+
         // Raw Measurement
         drawTarget(
           systemState.measured_target.x,
